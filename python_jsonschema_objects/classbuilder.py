@@ -6,9 +6,9 @@ import collections
 import itertools
 import six
 import sys
-
+import inflection
 import logging
-
+import json
 import python_jsonschema_objects.wrapper_types
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,16 @@ class ProtocolBase(collections.MutableMapping):
         )
 
     @classmethod
+    def from_file(cls, jsonfile):
+        """Create an object directly from a JSON file.
+        """
+        with open(jsonfile) as f:
+            msg = json.load(f)
+            obj = cls(**msg)
+            obj.validate()
+            return obj
+
+    @classmethod
     def from_json(cls, jsonmsg):
         """ Create an object directly from a JSON string.
 
@@ -107,7 +117,7 @@ class ProtocolBase(collections.MutableMapping):
             ValidationError: if `jsonmsg` does not match the schema
                 `cls` was generated from
         """
-        import json
+
         msg = json.loads(jsonmsg)
         obj = cls(**msg)
         obj.validate()
@@ -223,6 +233,31 @@ class ProtocolBase(collections.MutableMapping):
                                  name, self.__class__.__name__))
 
         return self._extended_properties[name]
+
+    @property
+    def fieldsname(self):
+        return sorted(self._properties.keys())
+
+    @property
+    def properties_name(self):
+        return sorted(self._properties.keys())
+
+    @property
+    def required_properties(self):
+        return sorted(self.__required__)
+
+    @property
+    def properties_value(self):
+        return [ self[k] for k in self.properties_name]
+
+    @property
+    def flatten_dict(self):
+        # return collections.OrderedDict(zip(self.fieldnames, self.properties_value))
+        return sorted(self.__required__)
+
+
+    def _type(self):
+        return self.__class__.__name__
 
     @classmethod
     def propinfo(cls, propname):
@@ -454,7 +489,7 @@ class ClassBuilder(object):
                 logger.debug(util.lazy_format("Resolving object for {0}", uri))
 
                 with self.resolver.resolving(uri) as resolved:
-                    self.resolved[uri] = None # Set incase there is a circular reference in schema definition
+                    self.resolved[uri] = None  # Set incase there is a circular reference in schema definition
                     self.resolved[uri] = self.construct(
                         uri,
                         resolved,
@@ -493,6 +528,7 @@ class ClassBuilder(object):
                 parent,**kw)
             return self.resolved[uri]
         elif clsdata.get('type') in ('integer', 'number', 'string', 'boolean', 'null'):
+
             self.resolved[uri] = self._build_literal(
                 uri,
                 clsdata)
@@ -511,18 +547,27 @@ class ClassBuilder(object):
                 "no type and no reference".format(clsdata))
 
     def _build_literal(self, nm, clsdata):
-      """@todo: Docstring for _build_literal
+        """@todo: Docstring for _build_literal
 
-      :nm: @todo
-      :clsdata: @todo
-      :returns: @todo
+        :nm: @todo
+        :clsdata: @todo
+        :returns: @todo
 
-      """
-      cls = type(str(nm), tuple((LiteralValue,)), {
-        '__propinfo__': { '__literal__': clsdata}
-        })
+        """
 
-      return cls
+        if not 'enum' in clsdata:
+            is_enum = False
+            cls = type(str(nm), tuple((LiteralValue,)), {'is_enum': is_enum,
+            '__propinfo__': { '__literal__': clsdata}
+            })
+        else:
+            enum_values = sorted(clsdata['enum'])
+            is_enum = True
+            cls = type(str(nm), tuple((LiteralValue,)), { 'enum_values': enum_values,
+                'is_enum': is_enum, '__propinfo__': {'__literal__': clsdata}
+            })
+
+        return cls
 
     def _build_object(self, nm, clsdata, parents,**kw):
         logger.debug(util.lazy_format("Building object {0}", nm))
@@ -535,6 +580,7 @@ class ClassBuilder(object):
 
         if 'properties' in clsdata:
             properties = util.propmerge(properties, clsdata['properties'])
+
 
         name_translation = {}
 
@@ -556,6 +602,7 @@ class ClassBuilder(object):
                     {'type': self.resolved[uri]},
                       self.resolved[uri].__doc__)
                 properties[prop]['type'] = self.resolved[uri]
+
 
             elif 'type' not in detail and '$ref' in detail:
                 ref = detail['$ref']
@@ -647,6 +694,8 @@ class ClassBuilder(object):
 
                 props[prop] = make_property(prop, {'type': typ}, desc)
 
+
+
         """ If this object itself has a 'oneOf' designation, then
         make the validation 'type' the list of potential objects.
         """
@@ -678,8 +727,25 @@ class ClassBuilder(object):
         props['__required__'] = required
         if required and kw.get("strict"):
             props['__strict__'] = True
-        cls = type(str(nm.split('/')[-1]), tuple(parents), props)
 
+        schema_title = ''
+        if 'title' in clsdata:
+            schema_title = clsdata['title']
+        elif 'id' in clsdata:
+            schema_title = clsdata['id']
+        else:
+            schema_title = nm.split('/')[-1]
+            schema_title = schema_title.split('.')[0]
+            if 'schema' not in schema_title.lower():
+                schema_title += ' schema'
+
+        schema_title = inflection.parameterize(six.text_type(schema_title), '_')
+        schema_title = inflection.camelize(schema_title)
+        schema_title = str(schema_title)
+
+        # nm.split('/')[-1])
+
+        cls = type(schema_title, tuple(parents), props)
         return cls
 
 
@@ -789,6 +855,7 @@ def make_property(prop, info, desc=""):
             raise TypeError("Unknown object type: '{0}'".format(info['type']))
 
         self._properties[prop] = val
+
 
     def delprop(self):
         if prop in self.__required__:

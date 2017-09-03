@@ -135,28 +135,46 @@ class Namespace(dict):
     dict methods.
 
     """
-
+    '''
     def __init__(self, obj={}):
         dict.__init__(self, obj)
-
+    '''
     def __dir__(self):
-        return list(self)
+        #return list(self)
+        #return dir(super(Namespace, self))
+        return sorted(set(dir(type(self))))
 
     def __repr__(self):
         return "%s(%s)" % (type(self).__name__, super(dict, self).__repr__())
 
+    '''
     def __getattribute__(self, name):
         try:
             return self[name]
         except KeyError:
             msg = "'%s' object has no attribute '%s'"
             raise AttributeError(msg % (type(self).__name__, name))
+    '''
+    
+    def __getattr__(self, attr):
+        try:
+            return self[attr]
+        except KeyError:
+            # to conform with __getattr__ spec
+            msg = "'%s' object has no attribute '%s'"
+            raise AttributeError(msg % (type(self).__name__, attr))
 
-    def __setattr__(self, name, value):
-        self[name] = value
+    def __setattr__(self, attr, value):
+        self[attr] = value
 
-    def __delattr__(self, name):
-        del self[name]
+    def __delattr__(self, attr):
+        del self[attr]
+
+    def items(self):
+        return super(Namespace, self).items()
+
+    def keys(self):
+        return super(Namespace, self).keys()
 
     #------------------------
     # "copy constructors"
@@ -184,24 +202,24 @@ class Namespace(dict):
     # static methods
 
     @staticmethod
-    def hasattr(ns, name):
+    def hasattr(ns, attr):
         try:
-            object.__getattribute__(ns, name)
+            object.__getattribute__(ns, attr)
         except AttributeError:
             return False
         return True
 
     @staticmethod
-    def getattr(ns, name):
-        return object.__getattribute__(ns, name)
+    def getattr(ns, attr):
+        return object.__getattribute__(ns, attr)
 
     @staticmethod
-    def setattr(ns, name, value):
-        return object.__setattr__(ns, name, value)
+    def setattr(ns, attr, value):
+        return object.__setattr__(ns, attr, value)
 
     @staticmethod
-    def delattr(ns, name):
-        return object.__delattr__(ns, name)
+    def delattr(ns, attr):
+        return object.__delattr__(ns, attr)
 
 
 def as_namespace(obj, names=None):
