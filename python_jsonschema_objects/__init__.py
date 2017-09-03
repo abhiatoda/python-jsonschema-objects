@@ -7,7 +7,7 @@ import copy
 import os.path
 import inflection
 import six
-
+import sys
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ import python_jsonschema_objects.classbuilder as classbuilder
 from python_jsonschema_objects.validators import ValidationError
 import python_jsonschema_objects.util
 import python_jsonschema_objects.markdown_support
+from python_jsonschema_objects._version import __version__
 
 __all__ = ['ObjectBuilder', 'markdown_support', 'ValidationError']
 
@@ -23,7 +24,7 @@ FILE = __file__
 
 class ObjectBuilder(object):
 
-    def __init__(self, schema_uri, resolved={}):
+    def __init__(self, schema_uri, schema_base_uri=None, resolved={}):
         self.mem_resolved = resolved
 
         if isinstance(schema_uri, six.string_types):
@@ -33,9 +34,17 @@ class ObjectBuilder(object):
                 self.schema = json.loads(fin.read())
         else:
             self.schema = schema_uri
-            uri = os.path.normpath(FILE)
-            self.basedir = os.path.dirname(uri)
+            if schema_base_uri and isinstance(schema_base_uri, six.string_types):
+                if os.path.isfile(schema_base_uri):
+                    self.basedir = os.path.dirname(schema_base_uri)
+                elif os.path.isdir(schema_base_uri):
+                    self.basedir = os.path.abspath(schema_base_uri)
+            else:
+                uri = os.path.normpath(FILE)
+                self.basedir = os.path.dirname(uri)
 
+        self.resolver = jsonschema.RefResolver('file://' + self.basedir + '/', self.schema)
+        '''
         self.resolver = jsonschema.RefResolver.from_schema(
             self.schema,
             handlers={
@@ -43,6 +52,7 @@ class ObjectBuilder(object):
                 'memory': self.memory_resolver
             }
         )
+        '''
 
         meta_validator = Draft4Validator(Draft4Validator.META_SCHEMA)
         meta_validator.validate(self.schema)
@@ -74,7 +84,6 @@ class ObjectBuilder(object):
         if self._resolved is None:
           self._classes = self.build_classes()
         return self._resolved.get(uri, None)
-
 
     def memory_resolver(self, uri):
         return self.mem_resolved[uri[7:]]
@@ -115,18 +124,19 @@ class ObjectBuilder(object):
         builder.construct(nm, self.schema,**kw)
         self._resolved = builder.resolved
 
+
         return (
             util.Namespace.from_mapping(dict(
-                (inflection.camelize(uri.split('/')[-1]),
+                (inflection.camelize((klass.__name__.split('/')[-1]).split('.')[0]),
                  klass) for uri,
                 klass in six.iteritems(builder.resolved)))
         )
+
+
 
 
 if __name__ == '__main__':
 
     validator = ObjectBuilder("../../protocol/json/schema.json")
 
-from ._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+
