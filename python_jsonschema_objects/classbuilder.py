@@ -415,6 +415,9 @@ class LiteralValue(object):
   def __float__(self):
     return float(self._value)
 
+  def __str__(self):
+    return str(self._value)
+
 
 class ClassBuilder(object):
 
@@ -621,6 +624,7 @@ class ClassBuilder(object):
                 properties[prop]['type'] = self.resolved[uri]
 
             elif 'oneOf' in detail:
+
                 potential = self.resolve_classes(detail['oneOf'])
                 logger.debug(util.lazy_format("Designating {0} as oneOf {1}", prop, potential))
                 desc = detail[
@@ -792,13 +796,13 @@ def make_property(prop, info, desc=""):
                 elif util.safe_issubclass(typ, ProtocolBase):
                     # force conversion- thus the val rather than validator assignment
                     try:
-                        val = typ(**util.coerce_for_expansion(val))
+                        coerced_val = typ(**util.coerce_for_expansion(val))
+                        coerced_val.validate()
                     except Exception as e:
                         errors.append(
                             "Failed to coerce to '{0}': {1}".format(typ, e))
                         pass
                     else:
-                        val.validate()
                         ok = True
                         break
                 elif util.safe_issubclass(typ, python_jsonschema_objects.wrapper_types.ArrayWrapper):
@@ -836,9 +840,7 @@ def make_property(prop, info, desc=""):
         elif util.safe_issubclass(info['type'], ProtocolBase):
             if not isinstance(val, info['type']):
                 val = info['type'](**util.coerce_for_expansion(val))
-
             val.validate()
-
         elif isinstance(info['type'], TypeProxy):
             val = info['type'](val)
 
