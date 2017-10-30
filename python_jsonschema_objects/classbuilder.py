@@ -796,6 +796,7 @@ def make_property(prop, info, desc=""):
                 elif util.safe_issubclass(typ, ProtocolBase):
                     # force conversion- thus the val rather than validator assignment
                     try:
+                        logger.debug(util.lazy_format("Coercing value for '{0}' to {1}", type(val), typ))
                         coerced_val = typ(**util.coerce_for_expansion(val))
                         coerced_val.validate()
                     except Exception as e:
