@@ -13,41 +13,6 @@ from setuptools import setup, find_packages
 import versioneer
 
 
-def parse_requirements(path):
-    """Rudimentary parser for the `requirements.txt` file
-
-    We just want to separate regular packages from links to pass them to the
-    `install_requires` and `dependency_links` params of the `setup()`
-    function properly.
-    """
-    try:
-        print(os.path.join(os.path.dirname(__file__), *path.splitlines()))
-        requirements = map(str.strip, local_file(path).splitlines())
-    except IOError:
-        raise RuntimeError("Couldn't find the `requirements.txt' file :(")
-
-    links = []
-    pkgs = []
-    for req in requirements:
-        if not req:
-            continue
-        if 'http:' in req or 'https:' in req:
-            links.append(req)
-            name, version = re.findall("\#egg=([^\-]+)-(.+$)", req)[0]
-            pkgs.append('{0}=={1}'.format(name, version))
-        else:
-            pkgs.append(req)
-
-    return pkgs, links
-
-
-local_file = lambda *f: \
-    open(os.path.join(os.path.dirname(__file__), *f)).read()
-
-
-install_requires, dependency_links = \
-    parse_requirements('requirements.txt')
-
 if __name__ == '__main__':
     if 'register' in sys.argv or 'upload' in sys.argv:
         import register
@@ -76,18 +41,19 @@ if __name__ == '__main__':
           url='http://python-jsonschema-objects.readthedocs.org/',
           setup_requires=["setuptools>=18.0.0"],
           install_requires=[
-              "inflection~=0.2",
-              "Markdown==2.4",
-              "jsonschema~=2.3",
+              "inflection>=0.2",
+              "Markdown>=2.4",
+              "jsonschema>=2.3",
               "six>=1.5.2"
           ],
-          dependency_links=dependency_links,
           cmdclass=versioneer.get_cmdclass(),
           classifiers=[
               'Programming Language :: Python :: 2',
               'Programming Language :: Python :: 2.7',
               'Programming Language :: Python :: 3',
               'Programming Language :: Python :: 3.5',
+              'Programming Language :: Python :: 3.6',
+              'Programming Language :: Python :: 3.7',
               'Intended Audience :: Developers',
               'Development Status :: 4 - Beta',
               'License :: OSI Approved :: MIT License',
