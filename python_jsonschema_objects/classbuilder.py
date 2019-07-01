@@ -8,19 +8,18 @@ import collections
 import itertools
 import six
 import sys
-
+import inflection
 import logging
-
+import json
 import python_jsonschema_objects.wrapper_types
 
 logger = logging.getLogger(__name__)
 
 logger.addHandler(logging.NullHandler())
 
-
 # Long is no longer a thing in python3.x
 if sys.version_info > (3,):
-  long = int
+    long = int
 
 
 class ProtocolBase(collections.MutableMapping):
@@ -58,7 +57,7 @@ class ProtocolBase(collections.MutableMapping):
             if hasattr(propval, 'for_json'):
                 out[prop] = propval.for_json()
             elif isinstance(propval, list):
-                out[prop] = [getattr(x, 'for_json', lambda:x)() for x in propval]
+                out[prop] = [getattr(x, 'for_json', lambda: x)() for x in propval]
             elif isinstance(propval, (ProtocolBase, LiteralValue)):
                 out[prop] = propval.as_dict()
             elif propval is not None:
@@ -76,21 +75,31 @@ class ProtocolBase(collections.MutableMapping):
         return self.as_dict() == other.as_dict()
 
     def __str__(self):
-        inverter = dict((v, k) for k,v in six.iteritems(self.__prop_names__))
+        inverter = dict((v, k) for k, v in six.iteritems(self.__prop_names__))
         props = sorted(["%s" % (inverter.get(k, k),) for k, v in
-                 itertools.chain(six.iteritems(self._properties),
-                                 six.iteritems(self._extended_properties))])
+                        itertools.chain(six.iteritems(self._properties),
+                                        six.iteritems(self._extended_properties))])
         return "<%s attributes: %s>" % (self.__class__.__name__, ", ".join(props))
 
     def __repr__(self):
-        inverter = dict((v, k) for k,v in six.iteritems(self.__prop_names__))
+        inverter = dict((v, k) for k, v in six.iteritems(self.__prop_names__))
         props = sorted(["%s=%s" % (inverter.get(k, k), repr(v)) for k, v in
-                 itertools.chain(six.iteritems(self._properties),
-                                 six.iteritems(self._extended_properties))])
+                        itertools.chain(six.iteritems(self._properties),
+                                        six.iteritems(self._extended_properties))])
         return "<%s %s>" % (
             self.__class__.__name__,
             " ".join(props)
         )
+
+    @classmethod
+    def from_file(cls, jsonfile):
+        """Create an object directly from a JSON file.
+        """
+        with open(jsonfile) as f:
+            msg = json.load(f)
+            obj = cls(**msg)
+            obj.validate()
+            return obj
 
     @classmethod
     def from_json(cls, jsonmsg):
@@ -110,7 +119,7 @@ class ProtocolBase(collections.MutableMapping):
             ValidationError: if `jsonmsg` does not match the schema
                 `cls` was generated from
         """
-        import json
+
         msg = json.loads(jsonmsg)
         obj = cls(**msg)
         obj.validate()
@@ -206,19 +215,19 @@ class ProtocolBase(collections.MutableMapping):
             except Exception as e:
                 raise validators.ValidationError(
                     "Attempted to set unknown property '{0}': {1} "
-                    .format(name, e))
+                        .format(name, e))
 
             self._extended_properties[name] = val
 
     """ Implement collections.MutableMapping methods """
 
     def __iter__(self):
-      import itertools
-      return itertools.chain(six.iterkeys(self._extended_properties),
-                             six.iterkeys(self._properties))
+        import itertools
+        return itertools.chain(six.iterkeys(self._extended_properties),
+                               six.iterkeys(self._properties))
 
     def __len__(self):
-      return len(self._extended_properties) + len(self._properties)
+        return len(self._extended_properties) + len(self._properties)
 
     def __getitem__(self, key):
         try:
@@ -227,7 +236,7 @@ class ProtocolBase(collections.MutableMapping):
             raise KeyError(key)
 
     def __setitem__(self, key, val):
-      return setattr(self,key, val)
+        return setattr(self, key, val)
 
     def __delitem__(self, key):
         if key in self._extended_properties:
@@ -242,8 +251,31 @@ class ProtocolBase(collections.MutableMapping):
         if name in self._extended_properties:
             return self._extended_properties[name]
         raise AttributeError("{0} is not a valid property of {1}".format(
-                             name, self.__class__.__name__))
+            name, self.__class__.__name__))
 
+    @property
+    def fieldsname(self):
+        return sorted(self._properties.keys())
+
+    @property
+    def properties_name(self):
+        return sorted(self._properties.keys())
+
+    @property
+    def required_properties(self):
+        return sorted(self.__required__)
+
+    @property
+    def properties_value(self):
+        return [self[k] for k in self.properties_name]
+
+    @property
+    def flatten_dict(self):
+        # return collections.OrderedDict(zip(self.fieldnames, self.properties_value))
+        return sorted(self.__required__)
+
+    def _type(self):
+        return self.__class__.__name__
 
     @classmethod
     def propinfo(cls, propname):
@@ -270,7 +302,7 @@ class ProtocolBase(collections.MutableMapping):
         if len(missing) > 0:
             raise validators.ValidationError(
                 "'{0}' are required attributes for {1}"
-                            .format(missing, self.__class__.__name__))
+                    .format(missing, self.__class__.__name__))
 
         for prop, val in six.iteritems(self._properties):
             if val is None:
@@ -282,7 +314,7 @@ class ProtocolBase(collections.MutableMapping):
                 val.validate()
             elif isinstance(val, list):
                 for subval in val:
-                  subval.validate()
+                    subval.validate()
             else:
                 # This object is of the wrong type, but just try setting it
                 # The property setter will enforce its correctness
@@ -382,8 +414,6 @@ class TypeProxy(object):
             )
 
 
-
-
 class ClassBuilder(object):
 
     def __init__(self, resolver):
@@ -397,6 +427,7 @@ class ClassBuilder(object):
             if '$ref' in elem:
                 ref = elem['$ref']
                 uri = util.resolve_ref_uri(self.resolver.resolution_scope, ref)
+
                 if uri in self.resolved:
                     pp.append(self.resolved[uri])
                 else:
@@ -424,7 +455,7 @@ class ClassBuilder(object):
 
         return ret
 
-    def _construct(self, uri, clsdata, parent=(ProtocolBase,),**kw):
+    def _construct(self, uri, clsdata, parent=(ProtocolBase,), **kw):
 
         if 'anyOf' in clsdata:
             raise NotImplementedError(
@@ -450,7 +481,7 @@ class ClassBuilder(object):
             self.resolved[uri] = self._build_object(
                 uri,
                 clsdata,
-                parents,**kw)
+                parents, **kw)
             return self.resolved[uri]
 
         elif '$ref' in clsdata:
@@ -460,7 +491,7 @@ class ClassBuilder(object):
                 # It's possible that this reference was already resolved, in which
                 # case it will have its type parameter set
                 logger.debug(util.lazy_format("Using previously resolved type "
-                              "(with different URI) for {0}", uri))
+                                              "(with different URI) for {0}", uri))
                 self.resolved[uri] = clsdata['type']
             elif uri in self.resolved:
                 logger.debug(util.lazy_format("Using previously resolved object for {0}", uri))
@@ -470,23 +501,23 @@ class ClassBuilder(object):
                     self.resolver.resolution_scope, ref)
                 if refuri in self.under_construction:
                     logger.debug(
-                            util.lazy_format(
-                                    "Resolving cyclic reference from {0} to {1}.",
-                                    uri,
-                                    refuri))
+                        util.lazy_format(
+                            "Resolving cyclic reference from {0} to {1}.",
+                            uri,
+                            refuri))
                     return TypeRef(refuri, self.resolved)
                 else:
                     logger.debug(
-                            util.lazy_format(
-                                    "Resolving direct reference object for {0}: {1}",
-                                    uri,
-                                    refuri))
+                        util.lazy_format(
+                            "Resolving direct reference object for {0}: {1}",
+                            uri,
+                            refuri))
 
                     with self.resolver.resolving(refuri) as resolved:
                         self.resolved[uri] = self.construct(
-                                refuri,
-                                resolved,
-                                parent)
+                            refuri,
+                            resolved,
+                            parent)
 
             return self.resolved[uri]
 
@@ -518,7 +549,7 @@ class ClassBuilder(object):
             self.resolved[uri] = self._build_object(
                 uri,
                 clsdata,
-                parent,**kw)
+                parent, **kw)
             return self.resolved[uri]
         elif clsdata.get('type') in ('integer', 'number', 'string', 'boolean', 'null'):
             self.resolved[uri] = self._build_literal(
@@ -539,23 +570,40 @@ class ClassBuilder(object):
                 "no type and no reference".format(clsdata))
 
     def _build_literal(self, nm, clsdata):
-      """@todo: Docstring for _build_literal
+        """@todo: Docstring for _build_literal
 
-      :nm: @todo
-      :clsdata: @todo
-      :returns: @todo
+        :nm: @todo
+        :clsdata: @todo
+        :returns: @todo
 
-      """
-      cls = type(str(nm), tuple((LiteralValue,)), {
-        '__propinfo__': {
-            '__literal__': clsdata,
-            '__title__': clsdata.get('title'),
-            '__default__': clsdata.get('default')}
-        })
+          """
+        if 'enum' not in clsdata:
+            is_enum = False
+            cls = type(str(nm), tuple((LiteralValue,)), {
+                'is_enum': is_enum,
+                '__propinfo__': {
+                    '__literal__': clsdata,
+                    '__title__': clsdata.get('title'),
+                    '__default__': clsdata.get('default')}
+            })
 
-      return cls
+        else:
+            enum_values = sorted(clsdata['enum'])
+            is_enum = True
 
-    def _build_object(self, nm, clsdata, parents,**kw):
+            cls = type(str(nm), tuple((LiteralValue,)), {
+                'enum_values': enum_values,
+                'is_enum': is_enum,
+                '__propinfo__': {
+                    '__literal__': clsdata,
+                    '__title__': clsdata.get('title'),
+                    '__default__': clsdata.get('default')}
+            })
+
+        return cls
+
+
+    def _build_object(self, nm, clsdata, parents, **kw):
         logger.debug(util.lazy_format("Building object {0}", nm))
 
         # To support circular references, we tag objects that we're
@@ -575,7 +623,7 @@ class ClassBuilder(object):
         name_translation = {}
 
         for prop, detail in properties.items():
-            logger.debug(util.lazy_format("Handling property {0}.{1}",nm, prop))
+            logger.debug(util.lazy_format("Handling property {0}.{1}", nm, prop))
             properties[prop]['raw_name'] = prop
             name_translation[prop] = prop.replace('@', '')
             prop = name_translation[prop]
@@ -653,7 +701,7 @@ class ClassBuilder(object):
                                         item_detail)
 
                                     for i, item_detail in enumerate(detail['items']['oneOf'])]
-                                    )
+                                )
                             else:
                                 typ = self.construct(uri, detail['items'])
 
@@ -721,19 +769,32 @@ class ClassBuilder(object):
 
         invalid_requires = [req for req in required if req not in props['__propinfo__']]
         if len(invalid_requires) > 0:
-          raise validators.ValidationError("Schema Definition Error: {0} schema requires "
-                                           "'{1}', but properties are not defined"
-                                           .format(nm, invalid_requires))
+            raise validators.ValidationError("Schema Definition Error: {0} schema requires "
+                                             "'{1}', but properties are not defined"
+                                             .format(nm, invalid_requires))
 
         props['__required__'] = required
         props['__has_default__'] = defaults
         if required and kw.get("strict"):
             props['__strict__'] = True
+        schema_title = ''
+        if 'title' in clsdata:
+            schema_title = clsdata['title']
+        elif 'id' in clsdata:
+            schema_title = clsdata['id']
+        else:
+            schema_title = nm.split('/')[-1]
+            schema_title = schema_title.split('.')[0]
+            if 'schema' not in schema_title.lower():
+                schema_title += ' schema'
 
-        props['__title__'] = clsdata.get('title')
-        cls = type(str(nm.split('/')[-1]), tuple(parents), props)
+        schema_title = inflection.parameterize(six.text_type(schema_title), '_')
+        schema_title = inflection.camelize(schema_title)
+        schema_title = str(schema_title)
+
+        props['__title__'] = schema_title
+        cls = type(schema_title, tuple(parents), props)
         self.under_construction.remove(nm)
-
         return cls
 
 
