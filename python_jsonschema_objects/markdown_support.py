@@ -14,9 +14,14 @@ def extract_code_blocks(filename):
     preprocessors = M.preprocessors
     tree_processors = M.treeprocessors
 
+    try:
+        version_info = markdown.__version_info__
+    except AttributeError:
+        version_info = markdown.version_info
+
     # Markdown 3.* stores the processors in a class that can be iterated directly.
     # Markdown 2.* stores them in a dict, so we have to pull out the values.
-    if markdown.version_info[0] == 2:
+    if version_info[0] == 2:
         # Note: `markdown.version_info` will be deprecated in favor of
         # `markdown.__version_info__` in later versions of Markdown.
         preprocessors = preprocessors.values()
@@ -36,26 +41,28 @@ def extract_code_blocks(filename):
 
 
 class SpecialFencedCodeExtension(Extension):
-
     def extendMarkdown(self, md, md_globals=None):
         """ Add FencedBlockPreprocessor to the Markdown instance. """
         md.registerExtension(self)
 
-        md.preprocessors.add('fenced_code_block',
-                             SpecialFencePreprocessor(md),
-                             ">normalize_whitespace")
+        md.preprocessors.add(
+            "fenced_code_block", SpecialFencePreprocessor(md), ">normalize_whitespace"
+        )
 
 
 class SpecialFencePreprocessor(Preprocessor):
     EXAMPLES = {}
-    FENCED_BLOCK_RE = re.compile(r'''
+    FENCED_BLOCK_RE = re.compile(
+        r"""
 (?P<fence>^(?:~{3,}|`{3,}))[ ]*         # Opening ``` or ~~~
 (\{?\.?(?P<lang>[a-zA-Z0-9_+-]*))?[ ]*  # Optional {, and lang
 # Optional highlight lines, single- or double-quote-delimited
 (hl_lines=(?P<quot>"|')(?P<hl_lines>.*?)(?P=quot))?[ ]*
 }?[ ]*\n                                # Optional closing }
 (?P<code>.*?)(?<=\n)
-(?P=fence)[ ]*$''', re.MULTILINE | re.DOTALL | re.VERBOSE)
+(?P=fence)[ ]*$""",
+        re.MULTILINE | re.DOTALL | re.VERBOSE,
+    )
 
     def __init__(self, md):
         super(SpecialFencePreprocessor, self).__init__(md)
@@ -70,20 +77,19 @@ class SpecialFencePreprocessor(Preprocessor):
         while True:
             m = self.FENCED_BLOCK_RE.search(text)
             if m:
-                if m.group('lang'):
-                    lang = m.group('lang')
-                    example = m.group('code')
+                if m.group("lang"):
+                    lang = m.group("lang")
+                    example = m.group("code")
                     try:
                         self.EXAMPLES[lang].append(example)
                     except KeyError:
                         self.EXAMPLES[lang] = [example]
 
-                text = "%s\n%s"% (text[:m.start()], text[m.end():])
+                text = "%s\n%s" % (text[: m.start()], text[m.end() :])
             else:
                 break
         return text.split("\n")
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(extract_code_blocks())
