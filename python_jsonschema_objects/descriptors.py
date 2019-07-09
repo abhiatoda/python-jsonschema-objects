@@ -54,9 +54,13 @@ class AttributeDescriptor(object):
                         errors.append("Failed to coerce to '{0}': {1}".format(typ, e))
                         pass
                     else:
-                        validator.validate()
-                        ok = True
-                        break
+                        try:
+                            validator.validate()
+                            ok = True
+                            break
+                        except Exception as e:
+                            print "{}-{}".format(typ, e)
+                            errors.append("Failed to validate coerced type '{0}': {1}".format(typ, e))
                 elif util.safe_issubclass(typ, ProtocolBase):
                     # force conversion- thus the val rather than validator assignment
                     try:
@@ -65,9 +69,14 @@ class AttributeDescriptor(object):
                         errors.append("Failed to coerce to '{0}': {1}".format(typ, e))
                         pass
                     else:
-                        val.validate()
-                        ok = True
-                        break
+                        try:
+                            val.validate()
+                            ok = True
+                            break
+                        except Exception as e:
+                            print "{}-{}".format(typ, e)
+                            errors.append("Failed to validate coerced type '{0}': {1}".format(typ, e))
+
                 elif util.safe_issubclass(typ, wrapper_types.ArrayWrapper):
                     try:
                         val = typ(val)
@@ -75,9 +84,13 @@ class AttributeDescriptor(object):
                         errors.append("Failed to coerce to '{0}': {1}".format(typ, e))
                         pass
                     else:
-                        val.validate()
-                        ok = True
-                        break
+                        try:
+                            val.validate()
+                            ok = True
+                            break
+                        except Exception as e:
+                            print "{}-{}".format(typ, e)
+                            errors.append("Failed to validate coerced type '{0}': {1}".format(typ, e))
 
             if not ok:
                 errstr = "\n".join(errors)
