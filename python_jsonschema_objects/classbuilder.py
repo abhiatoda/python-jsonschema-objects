@@ -8,9 +8,9 @@ import collections
 import itertools
 import six
 import sys
-
+import inflection
 import logging
-
+import json
 import python_jsonschema_objects.wrapper_types
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,16 @@ class ProtocolBase(collections.MutableMapping):
             ]
         )
         return "<%s %s>" % (self.__class__.__name__, " ".join(props))
+
+    @classmethod
+    def from_file(cls, jsonfile):
+        """Create an object directly from a JSON file.
+        """
+        with open(jsonfile) as f:
+            msg = json.load(f)
+            obj = cls(**msg)
+            obj.validate()
+            return obj
 
     @classmethod
     def from_json(cls, jsonmsg):
@@ -277,6 +287,30 @@ class ProtocolBase(collections.MutableMapping):
             return
 
         return object.__delattr__(self, name)
+
+    @property
+    def fieldsname(self):
+        return sorted(self._properties.keys())
+
+    @property
+    def properties_name(self):
+        return sorted(self._properties.keys())
+
+    @property
+    def required_properties(self):
+        return sorted(self.__required__)
+
+    @property
+    def properties_value(self):
+        return [self[k] for k in self.properties_name]
+
+    @property
+    def flatten_dict(self):
+        # return collections.OrderedDict(zip(self.fieldnames, self.properties_value))
+        return sorted(self.__required__)
+
+    def _type(self):
+        return self.__class__.__name__
 
     @classmethod
     def propinfo(cls, propname):
@@ -581,17 +615,37 @@ class ClassBuilder(object):
       :returns: @todo
 
       """
-        cls = type(
-            str(nm),
-            tuple((LiteralValue,)),
-            {
-                "__propinfo__": {
-                    "__literal__": clsdata,
-                    "__title__": clsdata.get("title"),
-                    "__default__": clsdata.get("default"),
+        if "enum" not in clsdata:
+            is_enum = False
+            cls = type(
+                str(nm),
+                tuple((LiteralValue,)),
+                {
+                    "is_enum": is_enum,
+                    "__propinfo__": {
+                        "__literal__": clsdata,
+                        "__title__": clsdata.get("title"),
+                        "__default__": clsdata.get("default")
+                    }
                 }
-            },
-        )
+            )
+
+        else:
+            enum_values = sorted(clsdata["enum"])
+            is_enum = True
+            cls = type(
+                str(nm),
+                tuple((LiteralValue,)),
+                {
+                    "enum_values": enum_values,
+                    "is_enum": is_enum,
+                    "__propinfo__": {
+                        "__literal__": clsdata,
+                        "__title__": clsdata.get("title"),
+                        "__default__": clsdata.get("default"),
+                    }
+                }
+            )
 
         return cls
 
@@ -766,8 +820,23 @@ class ClassBuilder(object):
         if required and kw.get("strict"):
             props["__strict__"] = True
 
-        props["__title__"] = clsdata.get("title")
-        cls = type(str(nm.split("/")[-1]), tuple(parents), props)
+        schema_title = ""
+        if "title" in clsdata:
+            schema_title = clsdata["title"]
+        elif "id" in clsdata:
+            schema_title = clsdata["id"]
+        else:
+            schema_title = nm.split("/")[-1]
+            schema_title = schema_title.split('.')[0]
+            if "schema" not in schema_title.lower():
+                schema_title += " schema"
+
+        schema_title = inflection.parameterize(six.text_type(schema_title), "_")
+        schema_title = inflection.camelize(schema_title)
+        schema_title = str(schema_title)
+
+        props["__title__"] = schema_title
+        cls = type(schema_title, tuple(parents), props)
         self.under_construction.remove(nm)
 
         return cls

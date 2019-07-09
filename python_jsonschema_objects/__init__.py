@@ -24,7 +24,7 @@ FILE = __file__
 
 
 class ObjectBuilder(object):
-    def __init__(self, schema_uri, resolved={}, resolver=None, validatorClass=None):
+    def __init__(self, schema_uri, schema_base_uri=None, resolved={}, resolver=None, validatorClass=None):
         self.mem_resolved = resolved
 
         if isinstance(schema_uri, six.string_types):
@@ -34,10 +34,16 @@ class ObjectBuilder(object):
                 self.schema = json.loads(fin.read())
         else:
             self.schema = schema_uri
-            uri = os.path.normpath(FILE)
-            self.basedir = os.path.dirname(uri)
+            if schema_base_uri and isinstance(schema_base_uri, six.string_types):
+                if os.path.isfile(schema_base_uri):
+                    self.basedir = os.path.dirname(schema_base_uri)
+                elif os.path.isdir(schema_base_uri):
+                    self.basedir = os.path.abspath(schema_base_uri)
+            else:
+                uri = os.path.normpath(FILE)
+                self.basedir = os.path.dirname(uri)
 
-        self.resolver = resolver or jsonschema.RefResolver.from_schema(self.schema)
+        self.resolver = resolver or jsonschema.RefResolver("file://" + self.basedir + "/", self.schema)
         self.resolver.handlers.update(
             {"file": self.relative_file_resolver, "memory": self.memory_resolver}
         )
@@ -76,7 +82,15 @@ class ObjectBuilder(object):
         return self.mem_resolved[uri[7:]]
 
     def relative_file_resolver(self, uri):
-        path = os.path.join(self.basedir, uri[8:])
+
+        from jsonschema.compat import urlsplit
+        urlparts = urlsplit(uri)
+        path = None
+        if urlparts.scheme == "file":
+            path = urlparts.path
+
+        if (path and os.path.isdir(path)) or path is None:
+            path = os.path.join(self.basedir, uri[8:])
         with codecs.open(path, "r", "utf-8") as fin:
             result = json.loads(fin.read())
         return result
@@ -135,7 +149,7 @@ class ObjectBuilder(object):
         for uri, klass in six.iteritems(builder.resolved):
             title = getattr(klass, "__title__", None)
             if title is not None:
-                classes[name_transform(title)] = klass
+                classes[title] = klass
             elif not named_only:
                 classes[name_transform(uri.split("/")[-1])] = klass
 

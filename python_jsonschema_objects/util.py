@@ -153,11 +153,25 @@ class Namespace(dict):
             msg = "'%s' object has no attribute '%s'"
             raise AttributeError(msg % (type(self).__name__, name))
 
+    def __getattr__(self, attr):
+        try:
+            return self[attr]
+        except KeyError:
+            # to conform with __getattr__ spec
+            msg = "'%s' object has no attribute '%s'"
+            raise AttributeError(msg % (type(self).__name__, attr))
+
     def __setattr__(self, name, value):
         self[name] = value
 
     def __delattr__(self, name):
         del self[name]
+
+    def items(self):
+        return super(Namespace, self).items()
+
+    def keys(self):
+        return super(Namespace, self).keys()
 
     # ------------------------
     # "copy constructors"
