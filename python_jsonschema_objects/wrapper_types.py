@@ -120,10 +120,9 @@ class ArrayWrapper(collections.MutableSequence):
         return True
 
     def validate_uniqueness(self):
-
-        if getattr(self, "uniqueItems", False) is True:
-            testset = set(repr(item) for item in self.data)
-            if len(testset) != len(self.data):
+        from jsonschema._utils import uniq
+        if getattr(self, 'uniqueItems', False) is True:
+            if not uniq(self.data):
                 raise ValidationError(
                     "{0} has duplicate elements, but uniqueness required".format(
                         self.data
