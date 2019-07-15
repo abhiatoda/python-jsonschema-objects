@@ -141,25 +141,25 @@ class Namespace(dict):
         dict.__init__(self, obj)
 
     def __dir__(self):
-        return list(self)
+        return sorted(set(dir(type(self))))
 
     def __repr__(self):
         return "%s(%s)" % (type(self).__name__, super(dict, self).__repr__())
 
-    def __getattribute__(self, name):
-        try:
-            return self[name]
-        except KeyError:
-            msg = "'%s' object has no attribute '%s'"
-            raise AttributeError(msg % (type(self).__name__, name))
+    def __getitem__(self, name):
+        return self[name]
 
-    def __getattr__(self, attr):
-        try:
-            return self[attr]
-        except KeyError:
-            # to conform with __getattr__ spec
-            msg = "'%s' object has no attribute '%s'"
-            raise AttributeError(msg % (type(self).__name__, attr))
+    def __setitem__(self, name, value):
+        self[name] = value
+
+    def __delitem__(self, name):
+        del self[name]
+
+    def __iter__(self):
+        return super(Namespace, self).__iter__()
+
+    def __len__(self):
+        return len(self.items())
 
     def __setattr__(self, name, value):
         self[name] = value
