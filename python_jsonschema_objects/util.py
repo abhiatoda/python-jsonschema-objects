@@ -147,7 +147,7 @@ class Namespace(dict):
         return "%s(%s)" % (type(self).__name__, super(dict, self).__repr__())
 
     def __getitem__(self, name):
-        return self[name]
+        return dict.__getitem__(self, name)
 
     def __setitem__(self, name, value):
         self[name] = value
@@ -160,6 +160,13 @@ class Namespace(dict):
 
     def __len__(self):
         return len(self.items())
+
+    def __getattribute__(self, name):
+        try:
+            return dict.__getattribute__(self, name)
+        except KeyError:
+            msg = "'%s' object has no attribute '%s'"
+            raise AttributeError(msg % (type(self).__name__, name))
 
     def __setattr__(self, name, value):
         self[name] = value
