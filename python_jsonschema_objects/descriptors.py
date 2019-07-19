@@ -59,7 +59,6 @@ class AttributeDescriptor(object):
                             ok = True
                             break
                         except Exception as e:
-                            print "{}-{}".format(typ, e)
                             errors.append("Failed to validate coerced type '{0}': {1}".format(typ, e))
                 elif util.safe_issubclass(typ, ProtocolBase):
                     # force conversion- thus the val rather than validator assignment
@@ -74,7 +73,6 @@ class AttributeDescriptor(object):
                             ok = True
                             break
                         except Exception as e:
-                            print "{}-{}".format(typ, e)
                             errors.append("Failed to validate coerced type '{0}': {1}".format(typ, e))
 
                 elif util.safe_issubclass(typ, wrapper_types.ArrayWrapper):
@@ -89,7 +87,6 @@ class AttributeDescriptor(object):
                             ok = True
                             break
                         except Exception as e:
-                            print "{}-{}".format(typ, e)
                             errors.append("Failed to validate coerced type '{0}': {1}".format(typ, e))
 
             if not ok:
